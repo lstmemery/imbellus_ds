@@ -5,20 +5,37 @@ output: github_markdown
 
 ```{r libraries}
 library(tidyverse)
+library(broom)
 ```
 
 ```{r datasets}
 df <- readr::read_csv("data/ABC_Bank_Customers.csv")
 ```
 
+```{r}
+summary(df)
+```
+
+```{r}
+sapply(df, class)
+```
+
+
 I'm going to start by removing row number, customer id, and surname. It's possible that surname is useful (Perhaps we could uses number of people in family instead?). Now number and customer id may also contain a data leak, but the goal of this analysis is explanation and that won't help us.
 
-In addition, we should consider the Exited as a categorical variable.
+In addition, we should consider the Exited, Has Credit Card, Is Active Member as boolean categorical variables. Gender and Geography should be also factors. Estimated Salary and Balance should be log transformed, as well, since the range of the feature are so large. I toyed with the idea of making Tenure and Number of Products ordered variables, but decided that they are both count data, not ranked data. This is a minor distinction but will save me some hassle later on. 
 
 ```{r}
 surnameless_df <- df %>% 
-  select(-RowNumber, -Surname, -CreditScore)
+  select(-RowNumber, -Surname, -CustomerId) %>%
+  mutate_at(c("Gender", "Geography", "Exited", "HasCrCard", "IsActiveMember"), as.factor) %>% 
+  mutate_at(c("EstimatedSalary", "Balance"), log1p) # log1p is log(1 + x), which protects us in the case of 0
 ```
+
+```{r}
+sapply(surnameless_df, class)
+```
+
 
 GGally is a lovely package for quick EDA. `ggpairs` creates a plot for two 
 
@@ -26,9 +43,34 @@ GGally is a lovely package for quick EDA. `ggpairs` creates a plot for two
 GGally::ggpairs(data = surnameless_df)
 ```
 
+Let's try a basic logistic regresison model:
+
+```{r}
+exploratory_log_model <- glm(Exited ~ ., data=surnameless_df, family = binomial)
+```
 
 
 ```{r}
-GGally::ggduo()
+(log_model_results <- tidy(exploratory_log_model))
+```
+
+Let's take a look at the "insignificant" results.
+
+```{r}
+ log_model_results %>% 
+  mutate(suggestive = ifelse(p.value < 0.05, TRUE, FALSE)) %>% 
+  filter(suggestive == FALSE)
+```
+
+Since the treatment of France to Germany was considered significant, we can still include geography.
+
+```{r}
+glance(exploratory_log_model)
+```
+
+I will export this data to python run more tests on the data.
+
+```{r}
+feather::write_feather(surnameless_df, "results/cleaned_df.feather")
 ```
 
