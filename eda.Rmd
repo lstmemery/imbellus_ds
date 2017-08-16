@@ -1,0 +1,34 @@
+---
+title: "Exploratory Data Analysis"
+output: github_markdown
+---
+
+```{r libraries}
+library(tidyverse)
+```
+
+```{r datasets}
+df <- readr::read_csv("data/ABC_Bank_Customers.csv")
+```
+
+I'm going to start by removing row number, customer id, and surname. It's possible that surname is useful (Perhaps we could uses number of people in family instead?). Now number and customer id may also contain a data leak, but the goal of this analysis is explanation and that won't help us.
+
+In addition, we should consider the Exited as a categorical variable.
+
+```{r}
+surnameless_df <- df %>% 
+  select(-RowNumber, -Surname, -CreditScore)
+```
+
+GGally is a lovely package for quick EDA. `ggpairs` creates a plot for two 
+
+```{r fig.height=12, fig.width=12}
+GGally::ggpairs(data = surnameless_df)
+```
+
+
+
+```{r}
+GGally::ggduo()
+```
+
