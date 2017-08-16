@@ -1,0 +1,15 @@
+Variable Name	Meaning
+Row Number	The row  number of the record
+CustomerId	The Id of the Customer at the bank
+Surname		The last name of the customer
+CreditScore	The credit score of the customer
+Geography	The location of the customer
+Gender		The gender of the customer
+Age		The age of the customer
+Tenure		The period of time that the person has been a customer of the bank
+Balance		The current balance in the savings account of the customer
+NumOfProducts	The number of products that the customer has with the bank (Ex: Savings Account, Checking Account, Credit Card, Auto Loan etc.)
+HasCrCard	1 if the customer has a credit card with the bank else 0
+IsActiveMember	1 if the customer is an active member, 0 if not
+EstimatedSalary	The estimated salary of the customer
+Exited		1 if the customer has quit the bank, 0 of not
