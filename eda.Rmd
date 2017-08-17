@@ -70,7 +70,20 @@ glance(exploratory_log_model)
 
 I will export this data to python run more tests on the data.
 
+
+
 ```{r}
-feather::write_feather(surnameless_df, "results/cleaned_df.feather")
+y_df <- surnameless_df %>% 
+  select(Exited)
+
+export_df <- as_tibble(model.matrix(exploratory_log_model)) %>% 
+  bind_cols(y_df) %>% 
+  select(-`(Intercept)`)
+                       
+feather::write_feather(export_df, "results/cleaned_df.feather")
+```
+
+```{r}
+sessionInfo()
 ```
 
