@@ -1,6 +1,6 @@
 ---
 title: "Exploratory Data Analysis"
-output: github_markdown
+output: github_document
 ---
 
 ```{r libraries}
@@ -16,14 +16,17 @@ df <- readr::read_csv("data/ABC_Bank_Customers.csv")
 summary(df)
 ```
 
+Notice that only 20% of the people in this dataset exited. If I has more time, I would evaluate the effects of this imbalance in the dataset.
+
 ```{r}
 sapply(df, class)
 ```
 
+There are too many columns here and some, (such as CustomerID) are the wrong data type.
 
 I'm going to start by removing row number, customer id, and surname. It's possible that surname is useful (Perhaps we could uses number of people in family instead?). Now number and customer id may also contain a data leak, but the goal of this analysis is explanation and that won't help us.
 
-In addition, we should consider the Exited, Has Credit Card, Is Active Member as boolean categorical variables. Gender and Geography should be also factors. Estimated Salary and Balance should be log transformed, as well, since the range of the feature are so large. I toyed with the idea of making Tenure and Number of Products ordered variables, but decided that they are both count data, not ranked data. This is a minor distinction but will save me some hassle later on. 
+In addition, we should consider the Exited, Has Credit Card, Is Active Member as Boolean categorical variables. Gender and Geography should be also factors. Estimated Salary and Balance should be log transformed, as well, since the range of those features are so large. I toyed with the idea of making Tenure and Number of Products ordered variables, but decided that they are both count data, not ranked data. This is a minor distinction but will save me some hassle later on. 
 
 ```{r}
 surnameless_df <- df %>% 
@@ -43,44 +46,73 @@ GGally is a lovely package for quick EDA. `ggpairs` creates a plot for two
 GGally::ggpairs(data = surnameless_df)
 ```
 
-Let's try a basic logistic regresison model:
+Just looking at this facet grid, there a few things I see. Take a look at the rightmost column. These are interactions between "Exited" and the other columns. Credit Score, Geography, Gender, Number of Products, Salary, and Salary all seem to have similar distributions between those who have and have not exited. Age and Balance seem to have different distributations. This would suggest that they could be good features.
+
 
 ```{r}
-exploratory_log_model <- glm(Exited ~ ., data=surnameless_df, family = binomial)
+set.seed(22)
+test_df <- sample_frac(surnameless_df, 0.2)
+train_df <- anti_join(surnameless_df, test_df) # Remove anything included in test_df
+```
+
+
+Before I make any more powerful predictive models, I am going to create a basic logistic regression model on all of the data.
+
+```{r}
+exploratory_log_model <- glm(Exited ~ ., data=train_df, family = binomial) # Binomial family for logistic regression
 ```
 
 
 ```{r}
-(log_model_results <- tidy(exploratory_log_model))
+(log_model_results <- broom::tidy(exploratory_log_model) %>% 
+   arrange(p.value))
 ```
 
-Let's take a look at the "insignificant" results.
+Let's take a look at the "insignificant" (p > 0.05) results.
 
 ```{r}
  log_model_results %>% 
-  mutate(suggestive = ifelse(p.value < 0.05, TRUE, FALSE)) %>% 
-  filter(suggestive == FALSE)
+  mutate(significant = ifelse(p.value < 0.05, TRUE, FALSE)) %>% 
+  filter(significant == FALSE)
 ```
 
-Since the treatment of France to Germany was considered significant, we can still include geography.
+Since the treatment of France to Germany was considered significant, we can still include geography. Tenure, number of products, salary and credit score do not seem to have an effect. Note that linear models are only capable of detecting linear relationships. I will add evidence about this claim in the Jupyter Notebook.
+
+Now we should evaluate how well the model predicted with logloss and accuracy.
 
 ```{r}
-glance(exploratory_log_model)
+test_y <- select(test_df, Exited) %>% 
+  mutate(Exited = ifelse(Exited == "0", 0, 1)) # Converting factor back to bool
+test_x <- select(test_df, -Exited)
 ```
 
-I will export this data to python run more tests on the data.
 
+```{r}
+test_predict_proba <- predict.glm(exploratory_log_model, newdata = test_x, type = "response")
+Metrics::logLoss(test_y %>% pull(Exited), test_predict_proba)
+```
+This is actually a rather good log loss!
 
+Here's the accuracy of the model:
+
+```{r}
+test_predict <- round(test_predict_proba)
+1 - Metrics::ce(test_y %>% pull(Exited), test_predict)
+```
+
+I will export this data to python run more tests on the data. Here, I'll do a neat trick to get are to do all the one hot encoding for me. I concatenate the Exited column to the model matrix of glm that contains all the data. Then I export it as a feather, a pandas/R interoperable format. 
 
 ```{r}
 y_df <- surnameless_df %>% 
   select(Exited)
 
-export_df <- as_tibble(model.matrix(exploratory_log_model)) %>% 
+export_model <- glm(Exited ~ ., data=surnameless_df, family = binomial)
+
+export_df <- as_tibble(model.matrix(export_model)) %>% 
   bind_cols(y_df) %>% 
   select(-`(Intercept)`)
                        
-feather::write_feather(export_df, "results/cleaned_df.feather")
+feather::write_feather(export_df, "results/cleaned_df.feather") # Feather is a fast, interoperable file format for
 ```
 
 ```{r}
